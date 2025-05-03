@@ -65,7 +65,7 @@ class RunConfig(TrainConfig):
     """Random seed for shuffling the dataset."""
 
     data_preprocessing_num_proc: int = field(
-        default_factory=lambda: cpu_count() // 2,
+        default_factory=lambda: cpu_count(),
     )
     """Number of processes to use for preprocessing data"""
 
