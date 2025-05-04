@@ -35,7 +35,7 @@ class RunConfig(TrainConfig):
     )
     """Path to the dataset to use for training."""
 
-    split: str = "train[:50%]"
+    split: str = "train"
     """Dataset split to use for training."""
 
     ctx_len: int = 2048
