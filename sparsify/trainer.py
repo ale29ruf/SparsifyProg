@@ -422,7 +422,10 @@ class Trainer:
             loss = (
                 out.fvu + self.cfg.auxk_alpha * out.auxk_loss + out.multi_topk_fvu / 8
             )
-            loss.div(acc_steps).backward()
+            # La divisione per 8 è un fattore empirico per ridurre il peso di multi_topk_fvu e farlo contribuire solo marginalmente.
+            # Si divide la loss per "acc_steps" dato che stiamo accumulando i gradienti su più batch. E' come se stessimo calcolando
+            # il contributo medio della loss sui vari micro_bacth.
+            loss.div(acc_steps).backward() 
 
         k = self.get_current_k()
         for name, sae in self.saes.items():

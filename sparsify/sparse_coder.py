@@ -200,15 +200,18 @@ class SparseCoder(nn.Module):
     def forward(
         self, x: Tensor, y: Tensor | None = None, *, dead_mask: Tensor | None = None
     ) -> ForwardOutput:
-        top_acts, top_indices, pre_acts = self.encode(x)
 
-        # If we aren't given a distinct target, we're autoencoding
+        # dead_mask è una maschera booleana che indica quali neuroni latenti sono "morti" (cioè non si attivano mai)
+        
+        top_acts, top_indices, pre_acts = self.encode(x) # restituisce le attivazioni del livello latente e i k attivi più forti per ogni input
+
+        # If we aren't given a distinct target, we're autoencoding (il target da ricostruire è proprio l'input)
         if y is None:
             y = x
 
         # Decode
-        sae_out = self.decode(top_acts, top_indices)
-        if self.W_skip is not None:
+        sae_out = self.decode(top_acts, top_indices) # ricostruisce l'output a partire dai top attivi latenti
+        if self.W_skip is not None: # se esiste aggiunge un termine di skip connection lineare
             sae_out += x.to(self.dtype) @ self.W_skip.mT
 
         # Compute the residual
@@ -217,32 +220,38 @@ class SparseCoder(nn.Module):
         # Used as a denominator for putting everything on a reasonable scale
         total_variance = (y - y.mean(0)).pow(2).sum()
 
+        ## Il seguente blocco serve a forzare i latenti "morti" (mai attivati) ad apprendere qualcosa
         # Second decoder pass for AuxK loss
         if dead_mask is not None and (num_dead := int(dead_mask.sum())) > 0:
-            # Heuristic from Appendix B.1 in the paper
-            k_aux = y.shape[-1] // 2
+            # Si considera la metà della dimensione dell'output come numero massimo di latenti morti da usare (Heuristic from Appendix B.1 in the paper)
+            k_aux = y.shape[-1] // 2 
 
-            # Reduce the scale of the loss if there are a small number of dead latents
-            scale = min(num_dead / k_aux, 1.0)
-            k_aux = min(k_aux, num_dead)
+            scale = min(num_dead / k_aux, 1.0) # Se ci sono pochi neuroni morti rispetto a k_aux, si riduce l’impatto della loss
+            k_aux = min(k_aux, num_dead) # effettivo numero di latenti morti da usare (non può superare num_dead)
 
+            # Ovviamente non possiamo forzare i latenti vivi ad apprendere qualcosa, visto che appunto si attivano già in qualche caso
             # Don't include living latents in this loss
-            auxk_latents = torch.where(dead_mask[None], pre_acts, -torch.inf)
+            auxk_latents = torch.where(dead_mask[None], pre_acts, -torch.inf) # i latenti vivi assumeranno valore -inf, così si possono escludere facilmente con topk
 
             # Top-k dead latents
             auxk_acts, auxk_indices = auxk_latents.topk(k_aux, sorted=False)
+            # Spiegazione:
+            # Non tutti i latenti morti sono uguali. Un latente viene definito "dead" se il numero di token passati dalla sua ultima attivazione è maggiore di self.cfg.dead_feature_threshold
+            # La maschera viene aggiornata dopo ogni step di training.
+            # Per questo motivo, alcuni latenti morti sono totalemente inutili (attivazioni sempre 0), altri sono quasi morti quindi sono candidati promettenti per essere riabilitati.
 
-            # Encourage the top ~50% of dead latents to predict the residual of the
-            # top k living latents
+            # Encourage the top ~50% of dead latents to predict the residual of the top k living latents
             e_hat = self.decode(auxk_acts, auxk_indices)
-            auxk_loss = (e_hat - e.detach()).pow(2).sum()
-            auxk_loss = scale * auxk_loss / total_variance
+            auxk_loss = (e_hat - e.detach()).pow(2).sum() # usa i neuroni morti per vedere se riescono a spiegare quello che i vivi non hanno spiegato
+            auxk_loss = scale * auxk_loss / total_variance # pesa il rapporto per il numero di latenti morti rispetto al massimo possibile (secondo l'euristica)
         else:
             auxk_loss = sae_out.new_tensor(0.0)
 
         l2_loss = e.pow(2).sum()
         fvu = l2_loss / total_variance
 
+        # Il seguente blocco calcola una metrica chiamata "multi_topk_fvu", che è simile alla FVU (fraction of variance unexplained) ma usa 4 volte più latenti attivi del normale
+        # Ci dice quanto margine di miglioramento c'è se usassimo più neuroni
         if self.cfg.multi_topk:
             top_acts, top_indices = pre_acts.topk(4 * self.cfg.k, sorted=False)
             sae_out = self.decode(top_acts, top_indices)
