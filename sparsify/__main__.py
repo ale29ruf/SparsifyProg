@@ -35,6 +35,12 @@ class RunConfig(TrainConfig):
     )
     """Path to the dataset to use for training."""
 
+    name_dataset: str = field(
+        default="",
+        positional=True,
+    )
+    """Name of the dataset to use for training."""
+
     split: str = "train"
     """Dataset split to use for training."""
 
@@ -103,6 +109,7 @@ def load_artifacts(
         try:
             dataset = load_dataset(
                 args.dataset,
+                name= args.name,
                 split=args.split,
                 num_proc=args.data_preprocessing_num_proc,
                 # TODO: Maybe set this to False by default? But RPJ requires it.
