@@ -109,7 +109,7 @@ def load_artifacts(
         try:
             dataset = load_dataset(
                 args.dataset,
-                name= args.name,
+                name= args.name_dataset,
                 split=args.split,
                 num_proc=args.data_preprocessing_num_proc,
                 # TODO: Maybe set this to False by default? But RPJ requires it.
