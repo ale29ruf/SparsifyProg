@@ -263,6 +263,9 @@ class Trainer:
         print(f"Number of SAE parameters: {num_sae_params:_}")
         print(f"Number of model parameters: {num_model_params:_}")
 
+        print("self.dataset", self.dataset)
+        print("self.cfg.batch_size", self.cfg.batch_size)
+
         num_batches = len(self.dataset) // self.cfg.batch_size
         if self.global_step > 0:
             assert hasattr(self.dataset, "select"), "Dataset must implement `select`"
