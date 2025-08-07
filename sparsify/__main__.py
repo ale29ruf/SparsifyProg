@@ -112,6 +112,7 @@ def load_artifacts(
                 name= args.name_dataset,
                 split=args.split,
                 num_proc=args.data_preprocessing_num_proc,
+                streaming=True,
                 # TODO: Maybe set this to False by default? But RPJ requires it.
                 trust_remote_code=True,
             )
