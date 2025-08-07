@@ -115,7 +115,7 @@ def load_artifacts(
                 # TODO: Maybe set this to False by default? But RPJ requires it.
                 trust_remote_code=True,
             )
-        except ValueError as e:
+        except Exception as e:
             # Automatically use load_from_disk if appropriate
             if "load_from_disk" in str(e):
                 dataset = Dataset.load_from_disk(args.dataset, keep_in_memory=False)
