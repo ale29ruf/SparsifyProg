@@ -107,15 +107,16 @@ def load_artifacts(
     else:
         # For Huggingface datasets
         try:
-            dataset = load_dataset(
+            """dataset = load_dataset(
                 args.dataset,
                 name= args.name_dataset,
                 split=args.split,
                 num_proc=args.data_preprocessing_num_proc,
                 # TODO: Maybe set this to False by default? But RPJ requires it.
                 trust_remote_code=True,
-            )
-        except Exception as e:
+            )"""
+            dataset = Dataset.load_from_disk(args.dataset, keep_in_memory=False)
+        except ValueError as e:
             # Automatically use load_from_disk if appropriate
             if "load_from_disk" in str(e):
                 dataset = Dataset.load_from_disk(args.dataset, keep_in_memory=False)
